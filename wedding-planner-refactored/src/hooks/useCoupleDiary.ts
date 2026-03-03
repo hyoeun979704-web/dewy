@@ -19,18 +19,17 @@ export interface DiaryEntry extends Diary {
 }
 
 export const useCoupleDiary = () => {
-  const { user } = useAuth();
+  const { user, dbUserId } = useAuth();
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchEntries = useCallback(async () => {
-    if (!user) { setIsLoading(false); return; }
+    if (!user || !dbUserId) { setIsLoading(false); return; }
     try {
-      const userId = Number(user.id);
       const { data, error } = await supabase
         .from("diaries")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", dbUserId)
         .order("diary_date", { ascending: false });
       if (error) throw error;
 
@@ -53,20 +52,20 @@ export const useCoupleDiary = () => {
       const enriched: DiaryEntry[] = (data || []).map((d: any) => ({
         ...d,
         images: imagesMap[d.diary_id] || [],
-        is_mine: d.user_id === userId,
+        is_mine: d.user_id === dbUserId,
       }));
       setEntries(enriched);
     } catch (error) { console.error("Error fetching diary:", error); }
     finally { setIsLoading(false); }
-  }, [user]);
+  }, [user, dbUserId]);
 
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
 
   const createEntry = async (title: string, content: string, diaryDate: string, mood?: string): Promise<boolean> => {
-    if (!user) { toast.error("로그인이 필요합니다"); return false; }
+    if (!dbUserId) { toast.error("로그인이 필요합니다"); return false; }
     try {
       const { error } = await supabase.from("diaries").insert({
-        user_id: Number(user.id), title, content, diary_date: diaryDate, mood: mood || null,
+        user_id: dbUserId, title, content, diary_date: diaryDate, mood: mood || null,
       });
       if (error) throw error;
       toast.success("일기가 저장되었습니다 📝");
@@ -76,9 +75,14 @@ export const useCoupleDiary = () => {
   };
 
   const deleteEntry = async (diaryId: number): Promise<boolean> => {
-    if (!user) return false;
+    if (!dbUserId) return false;
     try {
-      await supabase.from("diaries").delete().eq("diary_id", diaryId).eq("user_id", Number(user.id));
+      const { error } = await supabase
+        .from("diaries")
+        .delete()
+        .eq("diary_id", diaryId)
+        .eq("user_id", dbUserId);
+      if (error) throw error;
       setEntries((prev) => prev.filter((e) => e.diary_id !== diaryId));
       toast.success("일기가 삭제되었습니다");
       return true;

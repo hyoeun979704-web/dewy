@@ -40,6 +40,15 @@ const PDF_STYLES = `
   .pdf-highlight { background: #fff0f3; padding: 12px 16px; border-radius: 10px; margin: 10px 0; }
 `;
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export function generatePdfHeader(title: string): string {
   const today = new Date();
   const dateStr = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, "0")}.${String(today.getDate()).padStart(2, "0")}`;
@@ -48,9 +57,9 @@ export function generatePdfHeader(title: string): string {
     <div class="pdf-page">
       <div class="pdf-header">
         <div class="pdf-logo">🌿 Dewy</div>
-        <div class="pdf-date">${dateStr}</div>
+        <div class="pdf-date">${escapeHtml(dateStr)}</div>
       </div>
-      <div class="pdf-title">${title}</div>
+      <div class="pdf-title">${escapeHtml(title)}</div>
   `;
 }
 

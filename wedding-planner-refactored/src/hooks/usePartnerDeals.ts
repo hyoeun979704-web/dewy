@@ -21,7 +21,7 @@ const categoryLabels: Record<string, string> = {
 export const useDealCategoryLabels = () => categoryLabels;
 
 export const usePartnerDeals = (category?: string) => {
-  const { user } = useAuth();
+  const { user, dbUserId } = useAuth();
   const [deals, setDeals] = useState<PartnerDeal[]>([]);
   const [featured, setFeatured] = useState<PartnerDeal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,11 +36,11 @@ export const usePartnerDeals = (category?: string) => {
       if (error) throw error;
 
       let claimedIds = new Set<number>();
-      if (user) {
+      if (dbUserId) {
         const { data: claims } = await supabase
           .from("user_actions")
           .select("target_id")
-          .eq("user_id", Number(user.id))
+          .eq("user_id", dbUserId)
           .eq("target_type", "EVENT");
         claimedIds = new Set((claims || []).map((c: any) => c.target_id));
       }
@@ -55,15 +55,15 @@ export const usePartnerDeals = (category?: string) => {
       setFeatured(enriched.slice(0, 3));
     } catch (error) { console.error("Error fetching deals:", error); }
     finally { setIsLoading(false); }
-  }, [category, user]);
+  }, [category, dbUserId]);
 
   useEffect(() => { fetchDeals(); }, [fetchDeals]);
 
   const claimDeal = async (eventId: number): Promise<boolean> => {
-    if (!user) { toast.error("로그인이 필요합니다"); return false; }
+    if (!dbUserId) { toast.error("로그인이 필요합니다"); return false; }
     try {
       const { error } = await supabase.from("user_actions").insert({
-        user_id: Number(user.id), target_type: "EVENT", target_id: eventId,
+        user_id: dbUserId, target_type: "EVENT", target_id: eventId,
       });
       if (error) {
         if (error.code === "23505") { toast.info("이미 받은 혜택이에요"); return false; }
@@ -79,7 +79,7 @@ export const usePartnerDeals = (category?: string) => {
 };
 
 export const usePartnerDealDetail = (id: number | string | undefined) => {
-  const { user } = useAuth();
+  const { dbUserId } = useAuth();
   const [deal, setDeal] = useState<PartnerDeal | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const eventId = typeof id === "string" ? parseInt(id, 10) : id;
@@ -91,8 +91,8 @@ export const usePartnerDealDetail = (id: number | string | undefined) => {
         const { data, error } = await supabase.from("events").select("*").eq("event_id", eventId).single();
         if (error) throw error;
         let isClaimed = false;
-        if (user) {
-          const { data: claim } = await supabase.from("user_actions").select("target_id").eq("user_id", Number(user.id)).eq("target_type", "EVENT").eq("target_id", eventId).maybeSingle();
+        if (dbUserId) {
+          const { data: claim } = await supabase.from("user_actions").select("target_id").eq("user_id", dbUserId).eq("target_type", "EVENT").eq("target_id", eventId).maybeSingle();
           isClaimed = !!claim;
         }
         setDeal({ ...data, is_claimed: isClaimed } as PartnerDeal);
@@ -100,7 +100,7 @@ export const usePartnerDealDetail = (id: number | string | undefined) => {
       finally { setIsLoading(false); }
     };
     fetchDeal();
-  }, [eventId, user]);
+  }, [eventId, dbUserId]);
 
   return { deal, isLoading };
 };

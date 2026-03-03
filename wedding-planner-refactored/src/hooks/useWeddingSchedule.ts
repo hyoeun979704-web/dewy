@@ -17,31 +17,30 @@ interface WeddingSettings {
 }
 
 export const useWeddingSchedule = () => {
-  const { user } = useAuth();
+  const { user, dbUserId } = useAuth();
   const [weddingSettings, setWeddingSettings] = useState<WeddingSettings>({ wedding_date: null, name: null, region_code: null });
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
-    if (!user) { setIsLoading(false); return; }
+    if (!user || !dbUserId) { setIsLoading(false); return; }
     try {
-      const userId = Number(user.id);
       const [userRes, itemsRes] = await Promise.all([
-        supabase.from("users").select("wedding_date, name, region_code").eq("user_id", userId).maybeSingle(),
-        supabase.from("schedules").select("*").eq("user_id", userId).order("scheduled_date", { ascending: true }),
+        supabase.from("users").select("wedding_date, name, region_code").eq("user_id", dbUserId).maybeSingle(),
+        supabase.from("schedules").select("*").eq("user_id", dbUserId).order("scheduled_date", { ascending: true }),
       ]);
       if (userRes.data) setWeddingSettings({ wedding_date: userRes.data.wedding_date, name: userRes.data.name, region_code: userRes.data.region_code });
       if (itemsRes.data) setScheduleItems(itemsRes.data as ScheduleItem[]);
     } catch (error) { console.error("Error fetching wedding schedule:", error); }
     finally { setIsLoading(false); }
-  }, [user]);
+  }, [user, dbUserId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const saveWeddingDate = async (date: string) => {
-    if (!user) { toast.error("로그인이 필요합니다"); return false; }
+    if (!dbUserId) { toast.error("로그인이 필요합니다"); return false; }
     try {
-      const { error } = await supabase.from("users").update({ wedding_date: date }).eq("user_id", Number(user.id));
+      const { error } = await supabase.from("users").update({ wedding_date: date }).eq("user_id", dbUserId);
       if (error) throw error;
       setWeddingSettings((prev) => ({ ...prev, wedding_date: date }));
       toast.success("결혼식 날짜가 저장되었습니다");
@@ -50,9 +49,9 @@ export const useWeddingSchedule = () => {
   };
 
   const addScheduleItem = async (title: string, scheduledDate: string, category = "기타") => {
-    if (!user) { toast.error("로그인이 필요합니다"); return false; }
+    if (!dbUserId) { toast.error("로그인이 필요합니다"); return false; }
     try {
-      const { data, error } = await supabase.from("schedules").insert({ user_id: Number(user.id), title, scheduled_date: scheduledDate, category, status: "예정" }).select("*").single();
+      const { data, error } = await supabase.from("schedules").insert({ user_id: dbUserId, title, scheduled_date: scheduledDate, category, status: "예정" }).select("*").single();
       if (error) throw error;
       setScheduleItems((prev) => [...prev, data as ScheduleItem].sort((a, b) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime()));
       toast.success("일정이 추가되었습니다");

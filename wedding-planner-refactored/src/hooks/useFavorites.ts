@@ -53,24 +53,24 @@ function toTargetType(itemType: ItemType): UserActionTargetType {
 }
 
 export const useFavorites = () => {
-  const { user } = useAuth();
+  const { user, dbUserId } = useAuth();
   const queryClient = useQueryClient();
 
   // user_actions에서 현재 유저의 모든 찜 목록 조회
   const { data: favorites = [], isLoading } = useQuery<UserAction[]>({
-    queryKey: ["user_actions", user?.id],
+    queryKey: ["user_actions", dbUserId],
     queryFn: async (): Promise<UserAction[]> => {
-      if (!user) return [];
+      if (!dbUserId) return [];
 
       const { data, error } = await supabase
         .from("user_actions")
         .select("*")
-        .eq("user_id", Number(user.id));
+        .eq("user_id", dbUserId);
 
       if (error) throw error;
       return (data || []) as UserAction[];
     },
-    enabled: !!user,
+    enabled: !!dbUserId,
   });
 
   const addFavorite = useMutation({
@@ -81,13 +81,13 @@ export const useFavorites = () => {
       itemId: number | string;
       itemType: ItemType;
     }) => {
-      if (!user) throw new Error("로그인이 필요합니다");
+      if (!dbUserId) throw new Error("로그인이 필요합니다");
 
       const targetId = typeof itemId === "string" ? parseInt(itemId, 10) : itemId;
       const targetType = toTargetType(itemType);
 
       const { error } = await supabase.from("user_actions").insert({
-        user_id: Number(user.id),
+        user_id: dbUserId,
         target_type: targetType,
         target_id: targetId,
       });
@@ -95,7 +95,7 @@ export const useFavorites = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["user_actions", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["user_actions", dbUserId] });
       toast.success("찜 목록에 추가되었습니다");
     },
     onError: (error) => {
@@ -112,7 +112,7 @@ export const useFavorites = () => {
       itemId: number | string;
       itemType: ItemType;
     }) => {
-      if (!user) throw new Error("로그인이 필요합니다");
+      if (!dbUserId) throw new Error("로그인이 필요합니다");
 
       const targetId = typeof itemId === "string" ? parseInt(itemId, 10) : itemId;
       const targetType = toTargetType(itemType);
@@ -120,14 +120,14 @@ export const useFavorites = () => {
       const { error } = await supabase
         .from("user_actions")
         .delete()
-        .eq("user_id", Number(user.id))
+        .eq("user_id", dbUserId)
         .eq("target_type", targetType)
         .eq("target_id", targetId);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["user_actions", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["user_actions", dbUserId] });
       toast.success("찜 목록에서 제거되었습니다");
     },
     onError: (error) => {

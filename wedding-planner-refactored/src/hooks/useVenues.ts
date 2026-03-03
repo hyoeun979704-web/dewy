@@ -38,10 +38,23 @@ const fetchVenues = async ({ pageParam = 0, filters }: FetchVenuesParams) => {
   }
 
   // keywords 필드에서 필터 (기존 hall_types, meal_options, event_options 대체)
+  // vendors 테이블에 전용 컬럼이 없으므로 keywords 텍스트 검색으로 처리
+  const keywordTerms: string[] = [];
+
   if (filters.hallTypes && filters.hallTypes.length > 0) {
-    // keywords 컬럼에서 키워드 검색으로 대체
-    const keywordFilter = filters.hallTypes.map((t) => `keywords.ilike.%${t}%`).join(",");
-    query = query.or(keywordFilter);
+    filters.hallTypes.forEach((t) => keywordTerms.push(`keywords.ilike.%${t}%`));
+  }
+
+  if (filters.mealOptions && filters.mealOptions.length > 0) {
+    filters.mealOptions.forEach((m) => keywordTerms.push(`keywords.ilike.%${m}%`));
+  }
+
+  if (filters.eventOptions && filters.eventOptions.length > 0) {
+    filters.eventOptions.forEach((e) => keywordTerms.push(`keywords.ilike.%${e}%`));
+  }
+
+  if (keywordTerms.length > 0) {
+    query = query.or(keywordTerms.join(","));
   }
 
   const { data, error, count } = await query

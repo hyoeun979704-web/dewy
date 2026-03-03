@@ -26,38 +26,38 @@ export interface BudgetSummary {
 }
 
 export function useBudget() {
-  const { user } = useAuth();
+  const { user, dbUserId } = useAuth();
   const queryClient = useQueryClient();
 
   // 사용자 정보 (total_budget, region_code)
   const userQuery = useQuery({
-    queryKey: ["user-profile", user?.id],
+    queryKey: ["user-profile", dbUserId],
     queryFn: async () => {
-      if (!user) return null;
+      if (!dbUserId) return null;
       const { data, error } = await supabase
         .from("users")
         .select("user_id, total_budget, region_code")
-        .eq("user_id", Number(user.id))
+        .eq("user_id", dbUserId)
         .maybeSingle();
       if (error) throw error;
       return data as Pick<User, "user_id" | "total_budget" | "region_code"> | null;
     },
-    enabled: !!user,
+    enabled: !!dbUserId,
   });
 
   // 카테고리별 예산 목록
   const budgetsQuery = useQuery({
-    queryKey: ["user-budgets", user?.id],
+    queryKey: ["user-budgets", dbUserId],
     queryFn: async () => {
-      if (!user) return [];
+      if (!dbUserId) return [];
       const { data, error } = await supabase
         .from("user_budgets")
         .select("*")
-        .eq("user_id", Number(user.id));
+        .eq("user_id", dbUserId);
       if (error) throw error;
       return (data || []) as UserBudget[];
     },
-    enabled: !!user,
+    enabled: !!dbUserId,
   });
 
   const budgets = budgetsQuery.data || [];
@@ -99,11 +99,11 @@ export function useBudget() {
   // 총 예산 업데이트
   const updateTotalBudget = useMutation({
     mutationFn: async (newTotal: number) => {
-      if (!user) throw new Error("로그인이 필요합니다");
+      if (!dbUserId) throw new Error("로그인이 필요합니다");
       const { error } = await supabase
         .from("users")
         .update({ total_budget: newTotal })
-        .eq("user_id", Number(user.id));
+        .eq("user_id", dbUserId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -114,7 +114,7 @@ export function useBudget() {
   // 카테고리 예산 저장/수정
   const saveCategoryBudget = useMutation({
     mutationFn: async (budget: Partial<UserBudget> & { category: string }) => {
-      if (!user) throw new Error("로그인이 필요합니다");
+      if (!dbUserId) throw new Error("로그인이 필요합니다");
 
       const existing = budgets.find((b) => b.category === budget.category);
 
@@ -129,7 +129,7 @@ export function useBudget() {
         if (error) throw error;
       } else {
         const { error } = await supabase.from("user_budgets").insert({
-          user_id: Number(user.id),
+          user_id: dbUserId,
           category: budget.category,
           target_amount: budget.target_amount ?? 0,
           spent_amount: budget.spent_amount ?? 0,

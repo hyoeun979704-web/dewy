@@ -14,18 +14,17 @@ export interface CartItemWithProduct extends CartRow {
 }
 
 export const useCart = () => {
-  const { user } = useAuth();
+  const { user, dbUserId } = useAuth();
   const [items, setItems] = useState<CartItemWithProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchCart = useCallback(async () => {
-    if (!user) { setItems([]); setIsLoading(false); return; }
+    if (!user || !dbUserId) { setItems([]); setIsLoading(false); return; }
     try {
-      const userId = Number(user.id);
       const { data, error } = await supabase
         .from("cart")
         .select("*")
-        .eq("user_id", userId);
+        .eq("user_id", dbUserId);
       if (error) throw error;
       const cartRows = (data || []) as CartRow[];
 
@@ -48,14 +47,13 @@ export const useCart = () => {
   useEffect(() => { fetchCart(); }, [fetchCart]);
 
   const addToCart = async (productId: number, productType: string = 'SHOPPING', quantity = 1): Promise<boolean> => {
-    if (!user) { toast.error("로그인이 필요합니다"); return false; }
+    if (!user || !dbUserId) { toast.error("로그인이 필요합니다"); return false; }
     try {
-      const userId = Number(user.id);
       const existing = items.find(i => i.product_id === productId && i.product_type === productType);
       if (existing) {
         await supabase.from("cart").update({ quantity: existing.quantity + quantity }).eq("cart_id", existing.cart_id);
       } else {
-        await supabase.from("cart").insert({ user_id: userId, product_type: productType, product_id: productId, quantity });
+        await supabase.from("cart").insert({ user_id: dbUserId, product_type: productType, product_id: productId, quantity });
       }
       toast.success("장바구니에 담았어요 🛒");
       await fetchCart();
@@ -66,23 +64,25 @@ export const useCart = () => {
   const updateQuantity = async (cartId: number, quantity: number) => {
     if (quantity < 1) return removeItem(cartId);
     try {
-      await supabase.from("cart").update({ quantity }).eq("cart_id", cartId);
+      const { error } = await supabase.from("cart").update({ quantity }).eq("cart_id", cartId);
+      if (error) throw error;
       setItems(prev => prev.map(i => i.cart_id === cartId ? { ...i, quantity } : i));
-    } catch (error) { console.error(error); }
+    } catch (error) { console.error(error); toast.error("수량 변경에 실패했습니다"); }
   };
 
   const removeItem = async (cartId: number) => {
     try {
-      await supabase.from("cart").delete().eq("cart_id", cartId);
+      const { error } = await supabase.from("cart").delete().eq("cart_id", cartId);
+      if (error) throw error;
       setItems(prev => prev.filter(i => i.cart_id !== cartId));
       toast.success("삭제되었습니다");
-    } catch (error) { console.error(error); }
+    } catch (error) { console.error(error); toast.error("삭제에 실패했습니다"); }
   };
 
   const clearCart = async () => {
-    if (!user) return;
+    if (!user || !dbUserId) return;
     try {
-      await supabase.from("cart").delete().eq("user_id", Number(user.id));
+      await supabase.from("cart").delete().eq("user_id", dbUserId);
       setItems([]);
     } catch (error) { console.error(error); }
   };

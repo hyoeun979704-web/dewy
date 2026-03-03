@@ -23,6 +23,9 @@ interface DewyResponse {
   error?: string;
 }
 
+/** AI 프롬프트 최대 길이. 초과 시 Edge Function 비용 폭증 및 타임아웃 유발 방지 */
+const MAX_PROMPT_LENGTH = 2000;
+
 export const useDewyStudio = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<DewyResponse | null>(null);
@@ -33,12 +36,28 @@ export const useDewyStudio = () => {
     prompt: string,
     options?: DewyOptions
   ): Promise<DewyResponse | null> => {
+    const trimmedPrompt = prompt.trim();
+
+    if (!trimmedPrompt) {
+      toast({ title: "입력 필요", description: "내용을 입력해 주세요.", variant: "destructive" });
+      return null;
+    }
+
+    if (trimmedPrompt.length > MAX_PROMPT_LENGTH) {
+      toast({
+        title: "입력 초과",
+        description: `최대 ${MAX_PROMPT_LENGTH}자까지 입력 가능합니다.`,
+        variant: "destructive",
+      });
+      return null;
+    }
+
     setIsLoading(true);
     setResult(null);
 
     try {
       const { data, error } = await supabase.functions.invoke("dewy-studio", {
-        body: { service, prompt, options },
+        body: { service, prompt: trimmedPrompt, options },
       });
 
       if (error) {

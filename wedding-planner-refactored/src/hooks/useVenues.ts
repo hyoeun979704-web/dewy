@@ -10,6 +10,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useFilterStore, FilterState } from "@/stores/useFilterStore";
 import type { Vendor } from "@/types/database";
 
+// PostgREST .or() 필터 문자열 인젝션 방지 (콤마·괄호 제거)
+const sanitizeFilterTerm = (v: string) => v.replace(/[,()]/g, "").trim();
+
 const VENUES_PER_PAGE = 10;
 
 /** 이전 Venue 인터페이스 → Vendor 기반으로 재정의 */
@@ -42,15 +45,24 @@ const fetchVenues = async ({ pageParam = 0, filters }: FetchVenuesParams) => {
   const keywordTerms: string[] = [];
 
   if (filters.hallTypes && filters.hallTypes.length > 0) {
-    filters.hallTypes.forEach((t) => keywordTerms.push(`keywords.ilike.%${t}%`));
+    filters.hallTypes.forEach((t) => {
+      const safe = sanitizeFilterTerm(t);
+      if (safe) keywordTerms.push(`keywords.ilike.%${safe}%`);
+    });
   }
 
   if (filters.mealOptions && filters.mealOptions.length > 0) {
-    filters.mealOptions.forEach((m) => keywordTerms.push(`keywords.ilike.%${m}%`));
+    filters.mealOptions.forEach((m) => {
+      const safe = sanitizeFilterTerm(m);
+      if (safe) keywordTerms.push(`keywords.ilike.%${safe}%`);
+    });
   }
 
   if (filters.eventOptions && filters.eventOptions.length > 0) {
-    filters.eventOptions.forEach((e) => keywordTerms.push(`keywords.ilike.%${e}%`));
+    filters.eventOptions.forEach((e) => {
+      const safe = sanitizeFilterTerm(e);
+      if (safe) keywordTerms.push(`keywords.ilike.%${safe}%`);
+    });
   }
 
   if (keywordTerms.length > 0) {

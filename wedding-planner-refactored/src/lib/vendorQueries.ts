@@ -15,6 +15,15 @@ import type {
   Review,
 } from "@/types/database";
 
+/**
+ * PostgREST의 .or() 필터 문자열에 직접 삽입되는 값을 안전하게 처리합니다.
+ * `,` 는 PostgREST OR 조건 구분자, `()`는 중첩 필터 구문자로 인젝션에 악용됩니다.
+ * 예: keyword="서울,vendor_id.gt.0" → vendor_id 조건이 주입되는 공격 방지
+ */
+function sanitizeFilterTerm(value: string): string {
+  return value.replace(/[,()]/g, "").trim();
+}
+
 // ─── 업체 목록 조회 (페이지네이션) ──────────────────
 
 export interface FetchVendorsParams {
@@ -56,10 +65,14 @@ export async function fetchVendorsByCategory({
   }
 
   // 키워드 검색
+  // sanitizeFilterTerm으로 PostgREST 필터 인젝션 방지 (콤마, 괄호 제거)
   if (keyword) {
-    query = query.or(
-      `name.ilike.%${keyword}%,keywords.ilike.%${keyword}%,address.ilike.%${keyword}%`
-    );
+    const safe = sanitizeFilterTerm(keyword);
+    if (safe) {
+      query = query.or(
+        `name.ilike.%${safe}%,keywords.ilike.%${safe}%,address.ilike.%${safe}%`
+      );
+    }
   }
 
   // 정렬: 평점 높은 순
@@ -127,14 +140,16 @@ export async function fetchImages(
 
 export async function fetchReviews(
   targetType: string,
-  targetId: number
+  targetId: number,
+  limit = 50
 ): Promise<Review[]> {
   const { data, error } = await supabase
     .from("reviews")
     .select("*")
     .eq("target_type", targetType)
     .eq("target_id", targetId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(limit); // 무제한 조회 방지: 인기 업체 리뷰 수천 건 로딩 차단
 
   if (error) throw error;
   return (data ?? []) as Review[];

@@ -41,7 +41,8 @@ export const useRecommendedItems = (activeTab: CategoryTab) => {
     queryFn: async (): Promise<RecommendedItem[]> => {
       const { data, error } = await supabase
         .from("vendors")
-        .select("*")
+        // 필요한 컬럼만 지정 — select("*") 대비 전송 데이터 축소
+        .select("vendor_id, name, region, address, avg_rating, review_count, thumbnail_url")
         .eq("category_type", config.categoryType)
         .order("avg_rating", { ascending: false })
         .limit(6);
@@ -59,5 +60,7 @@ export const useRecommendedItems = (activeTab: CategoryTab) => {
         imageUrl: item.thumbnail_url || "/placeholder.svg",
       }));
     },
+    // 추천 목록은 자주 바뀌지 않으므로 30분 캐시 — 탭 전환마다 재조회 방지
+    staleTime: 1000 * 60 * 30,
   });
 };
